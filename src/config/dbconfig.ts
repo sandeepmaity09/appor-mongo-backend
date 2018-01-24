@@ -16,7 +16,8 @@ export let connection = mongoose.connect(dbUrl);
 
 User.findOne({ "name": "superadmin" }).then(function (result) {
     if (!result) {
-        let user = new User({ uid: 1, name: 'superadmin', pass: 'superadmin', mail: 'superadmin@ongraph.com', access: 1, status: 1 });
+        let user = new User({ uid: 1, name: 'superadmin', mail: 'superadmin@ongraph.com', access: 1, status: 1 });
+        user.generateHash('superadmin');
         user.save().then(function () {
             console.log('saved successfully');
         });
