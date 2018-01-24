@@ -1,6 +1,3 @@
-import { rightAccess } from '../models/userModel'
-import { reach } from 'joi';
-
 export default class AccessService {
 
     constructor() { }
@@ -42,7 +39,4 @@ export default class AccessService {
             return false;
         }
     }
-
-    // private static isUser(acc): boolean | Number {
-    // }
 }
