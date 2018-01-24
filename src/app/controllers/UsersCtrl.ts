@@ -1,7 +1,8 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import { apiErrorHandler } from '../../handlers/errorHandler';
 import UsersRepo from '../repositories/UsersRepo';
-import { IUserModel, UserModel, rightAccess } from '../models/userModel';
+// import { IUserModel, UserModel, rightAccess } from '../models/userModel';
+import { IUserModel, User } from '../models/user';
 
 import TokenAuth from '../auth/tokenAuth';
 import userValidator from '../validators/userValidator';
@@ -10,17 +11,16 @@ import accessService from '../auth/accessService';
 import emailService from '../auth/emailService';
 
 import { access } from 'fs';
+import { userSchema } from '../schemas/user';
 
 export default class UsersRoutes {
 
     constructor() { }
 
     public signup(req: Request, res: Response, next: NextFunction) {
-        // console.log(req);
-        // console.log(req['decoded']);
         // console.log(req['decoded']['access']);
-
         // Check the request is valid or not
+
         let obj = userValidator.signupUserValidator(req);
         if (obj) {
             return res.json(obj)
@@ -32,51 +32,60 @@ export default class UsersRoutes {
         // console.log(accessFlag);
 
         if (accessFlag) {
-            // Creating a new user from model        
-            let user: UserModel = new UserModel();
-            user.uid = req.body.uid;
-            user.name = req.body.name;
-            user.mail = req.body.mail;
-            user.access = req.body.access;
-            // user.status = req.body.status;
-            user.generateHashPassword(req.body.pass);
+            UsersRepo.getUser(req.body.name).then(function (result) {
+                if (!result) {
 
-            if (user.access <= accessFlag) {
-                let role = accessService.getRoleName(user.access);
-                return res.json({
-                    status: false,
-                    message: "You're not authorized to create " + role + " User"
-                })
-            }
-            UsersRepo.signup(user)
-                .then((result: any) => {
-                    // redirect the user to login after successfully creating this from frontend
+                    console.log(result);
 
-                    // calling the message Service here
-                    emailService.sendEmailForSignup(user.name, req.body.pass, user.mail);
+                    // Creating a new user from model 
 
+                    let saveuser: IUserModel = new User({ uid: req.body.uid, name: req.body.name, pass: req.body.pass, mail: req.body.mail, access: req.body.access, status: req.body.status });
+                    saveuser.generateHash(req.body.pass);
+
+                    if (saveuser.access <= accessFlag) {
+                        let role = accessService.getRoleName(saveuser.access);
+                        return res.json({
+                            status: false,
+                            message: "You're not authorized to create " + role + " User"
+                        })
+                    }
+
+                    UsersRepo.signup(saveuser)
+                        .then((result: any) => {
+                            // redirect the user to login after successfully creating this from frontend
+
+                            // calling the message Service here
+                            emailService.sendEmailForSignup(saveuser.name, req.body.pass, saveuser.mail);
+
+                            res.json({
+                                success: true,
+                                message: 'User Successfully Created',
+                            });
+
+                            // also write here the code for sending a mail to user's mail id for successfully registering
+                        })
+                        .catch((err) => {
+                            res.json({
+                                success: false,
+                                message: 'User Creation Failed',
+                                error: err.message
+                            });
+                        });
+                } else {
                     res.json({
-                        success: true,
-                        message: 'User Successfully Created',
-                    });
+                        status: false,
+                        message: 'duplicate user found'
+                    })
+                }
+            })
 
-                    // also write here the code for sending a mail to user's mail id for successfully registering
-                })
-                .catch((err) => {
-                    res.json({
-                        success: false,
-                        message: 'User Creation Failed',
-                        error: err.message
-                    });
-                });
+
         } else {
             return res.json({
                 success: false,
                 message: "You're Not Authorized to Create a New User"
             })
         }
-
-
     }
 
     public login(req: Request, res: Response, next: NextFunction) {
@@ -86,35 +95,29 @@ export default class UsersRoutes {
         }
         let name = req.body.name;
         let pass = req.body.pass;
+
         UsersRepo.login(name)
-            .then((result: any) => {
-
-                // console.log(result);
-
+            .then((result: IUserModel) => {
                 if (!result) {
                     return res.json({
                         "message": "No user found by this name in Database"
                     });
                 }
-                let user = new UserModel();
-                user.uid = result.dataValues.uid;
-                user.name = result.dataValues.name;
-                user.pass = result.dataValues.pass;
-                user.access = result.dataValues.access;
-                let accountStatus = result.dataValues.status;
-                let successflag = user.validPassword(pass);
+                let successflag = result.validPassword(pass);
                 if (!successflag) {
                     return res.json({
                         success: false,
                         message: "invalid password"
                     });
-                } else if (accountStatus === 0) {
+                }
+                else if (result.status === 0) {
                     return res.json({
                         success: false,
                         message: "You're account is disable, Please Contact your ADMIN"
                     })
-                } else {
-                    const payload = { uid: user.uid, access: user.access }
+                }
+                else {
+                    const payload = { uid: result.uid, access: result.access }
                     var token = TokenAuth.tokenGenerator(payload);
                     res.json({
                         success: true,
@@ -166,7 +169,7 @@ export default class UsersRoutes {
 
         let name = req.body.name;
 
-        console.log('this is req.body.name',req.body.name);
+        console.log('this is req.body.name', req.body.name);
 
         UsersRepo.forgotPassword(name)
             .then((result: any) => {
@@ -181,8 +184,8 @@ export default class UsersRoutes {
                 // res.json(result[0]);
                 let email = result.dataValues.mail;
                 let token = TokenAuth.tokenGeneratorforReset({});
-                
-                emailService.sendEmailForReset(email,token);
+
+                emailService.sendEmailForReset(email, token);
 
                 res.json({
                     success: true,
@@ -195,29 +198,29 @@ export default class UsersRoutes {
             })
     }
 
-    public reset(req:Request, res:Response, next:NextFunction){
-        // console.log(req.query);aa
-        // console.log(req.params.id);
-        let token = req.params.id;
-        if (token) {
-            jsonwebtoken.verify(token, secret, function (error, decoded) {
-                if (error) {
-                    return res.json({
-                        success: false,
-                        message: 'Failed to Authenticate token'+' Token Expired!'
-                    })
-                } else {
-                    req.decoded = decoded;
-                    // console.log('this is from the decoded request',req.decoded);
-                    // next();
-                }
-            })
-        } else {
-            return res.send({
-                success: false,
-                message: "You're Not Authenticated to use this route"
-            })
+    // public reset(req:Request, res:Response, next:NextFunction){
+    //     // console.log(req.query);aa
+    //     // console.log(req.params.id);
+    //     let token = req.params.id;
+    //     if (token) {
+    //         jsonwebtoken.verify(token, secret, function (error, decoded) {
+    //             if (error) {
+    //                 return res.json({
+    //                     success: false,
+    //                     message: 'Failed to Authenticate token'+' Token Expired!'
+    //                 })
+    //             } else {
+    //                 req.decoded = decoded;
+    //                 // console.log('this is from the decoded request',req.decoded);
+    //                 // next();
+    //             }
+    //         })
+    //     } else {
+    //         return res.send({
+    //             success: false,
+    //             message: "You're Not Authenticated to use this route"
+    //         })
 
-        }
-    }
+    //     }
+    // }
 }

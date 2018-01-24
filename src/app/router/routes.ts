@@ -17,7 +17,7 @@ export default class Routes {
         // User Management Routes
         app.route(baseAPI + '/login').post(this.usersCtrl.login);
         app.route(baseAPI + '/forgot').post(this.usersCtrl.forgotPassword);
-        app.route(baseAPI + '/reset/:id').get(this.usersCtrl.reset);        
+        // app.route(baseAPI + '/reset/:id').get(this.usersCtrl.reset);        
         // app.route(baseAPI+'/reset').post();
 
         // Using Token Authenticator as a middleware
