@@ -5,7 +5,8 @@
   "scripts": {
     "start": "nodemon dist/server.js",
     "watch": "gulp",
-    "build": "gulp build"
+    "build": "gulp build",
+    "createdocs": "gulp typedoc"
   },
   "keywords": [
     "Node",
@@ -25,7 +26,6 @@
     "@types/morgan": "^1.7.35",
     "@types/node": "^7.0.48",
     "@types/nodemailer": "^4.3.1",
-    "@types/sequelize": "^4.0.79",
     "@types/winston": "^2.3.7",
     "express-winston": "^2.4.0",
     "gulp": "^3.9.1",
@@ -39,12 +39,14 @@
     "dotenv": "^4.0.0",
     "drupal-hash": "^1.0.4",
     "express": "^4.16.2",
+    "gulp-typedoc": "^2.2.0",
     "helmet": "^3.9.0",
     "jsonwebtoken": "^8.1.0",
     "mongoose": "^5.0.1",
     "morgan": "^1.9.0",
     "nodemailer": "^4.4.1",
     "sequelize": "^3.30.4",
+    "typedoc": "^0.9.0",
     "winston": "^2.4.0"
   }
 }
